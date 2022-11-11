@@ -1,0 +1,342 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Yidu_A_S_O_T_L_J_C
+
+//@version=5
+indicator("StairMaster TTF", overlay = true)
+
+uiGroup = "Config . UI"
+repaint = input(false, "Allow Signal Repainting", group=uiGroup)
+confirmed = repaint ? true : barstate.isconfirmed
+
+sensitivity = input(1, "Stair Sensitivity", group="Config . Stair")
+useAlternateFractal = input(true, "Use Alternate Fractal", group="Config . Stair")
+
+tsvGroup= "Config . Time Segmented Volume (TSV)"
+tsvLength = input(13, "TSV Length", group=tsvGroup)
+tsvma = input(7, "TSV MA (Filter) Length", group=tsvGroup)
+
+baselineGroup = "Config . BaseLine"
+blsource = input.source(close, "Source", group=baselineGroup)
+blLength = input(75, "Length", group=baselineGroup)
+blType = input.string("Smoothed", "Type", ["Smoothed", "Linear", "Exponential", "Weighted", "Simple", "Trend Regularity Adaptive", "Arnaud Legoux", "Hull", "Double Exponential", "Triple Exponential"], group=baselineGroup)
+blBias = input(true, "Use baseline as a bias filter", group=baselineGroup)
+
+rsiGroup = "Config . RSI"
+rsiLength = input(150, "RSI Length", group=rsiGroup)
+rsiSource = input.source(close, "RSI Source", group=rsiGroup)
+rsiMAType = input.string("Simple", "RSI MA Type", ["Smoothed", "Linear", "Exponential", "Weighted", "Simple", "Trend Regularity Adaptive", "Arnaud Legoux", "Hull", "Double Exponential", "Triple Exponential"], group=rsiGroup)
+rsiMALength = input(35, "RSI MA Length", group=rsiGroup)
+
+consolidationGroup = "Config . Consolidation Zone"
+enableConsolidationZone = input(true, "Show Consolidation Zones", group=consolidationGroup)
+timeframe = input.timeframe(defval="5", title="Timeframe", group=consolidationGroup)
+prd = input.int(defval = 10, title="Loopback Period", minval = 2, maxval = 50, group=consolidationGroup)
+conslen = input.int(defval = 5, title="Min Consolidation Length", minval = 2, maxval = 20, group=consolidationGroup)
+zonecol = input.color(defval = color.new(color.red, 90), title = "Zone Color", group=consolidationGroup)
+
+stochGroup = "Config . Stochastic RSI"
+enableStoch = input(true, "Enable Stochastic RSI", group=stochGroup)
+smoothK = input.int(3, "K", minval=1, group=stochGroup)
+smoothD = input.int(3, "D", minval=1, group=stochGroup)
+lengthRSI = input.int(14, "RSI Length", minval=1, group=stochGroup)
+lengthStoch = input.int(14, "Stochastic Length", minval=1, group=stochGroup)
+
+srGroup = "Config . Support & Resistance"
+showSR = input(false, "Show Support & Resistance", group=srGroup)
+left=input.int(50,title="Left Pivot", group=srGroup)
+right=input.int(25,title="Right Pivot", group=srGroup)
+quick_right=input.int(5,title="Quick Right Pivot", group=srGroup)
+
+// Session
+ts = input(false, title="Show Sessions", group="Trade Session")
+enableL = input(true, title="London", group="Trade Session")
+enableNY = input(true, title="NewYork", group="Trade Session")
+enableT = input(true, title="Asian", group="Trade Session")
+string dayG = "---------------"
+showMon = input(title="Monday", defval=true, group=dayG)
+showTue = input(title="Tuesday",  defval=true, group=dayG)
+showWed = input(title="Wednesday", defval=true, group=dayG)
+showThu = input(title="Thursday", defval=true, group=dayG)
+showFri = input(title="Friday", defval=true, group=dayG)
+showSat = input(title="Saturday", defval=false, group=dayG)
+showSun = input(title="Sunday", defval=false, group=dayG)
+
+indexHighTf = barstate.isrealtime ? 1 : 0
+buyColor = #00e1ff
+sellColor = #ff00dd
+
+// Stair
+th = high[2]>high[1] and high[2]>high and high[2]>high[3] and high[2]>high[4] ? -1 : 0
+bl = low[2]<low[1] and low[2]<low and low[2]<low[3] and low[2]<low[4] ? 1 : 0
+
+tot = th + bl
+pl = math.abs(tot)>=1 ? 1 : 0
+
+lowline = (ta.valuewhen(tot==1, low[2], 0) + (sensitivity>1 ? ta.valuewhen(tot==1, low[2], 1) : 0)
+     + (sensitivity>2 ? ta.valuewhen(tot==1, low[2], 2) : 0) + (sensitivity>3 ? ta.valuewhen(tot==1, low[2], 3) : 0)
+     + (sensitivity>4 ? ta.valuewhen(tot==1, low[2], 4) : 0) + (sensitivity>5 ? ta.valuewhen(tot==1, low[2], 5) : 0)
+     + (sensitivity>6 ? ta.valuewhen(tot==1, low[2], 6) : 0) + (sensitivity>7 ? ta.valuewhen(tot==1, low[2], 7) : 0)
+     + (sensitivity>8 ? ta.valuewhen(tot==1, low[2], 8) : 0) + (sensitivity>9 ? ta.valuewhen(tot==1, low[2], 9) : 0)
+     )/sensitivity
+
+highline = (ta.valuewhen(tot==-1, high[2], 0) + (sensitivity>1 ? ta.valuewhen(tot==-1, high[2], 1) : 0)
+     + (sensitivity>2 ? ta.valuewhen(tot==-1, high[2], 2) : 0) + (sensitivity>3 ? ta.valuewhen(tot==-1, high[2], 3) : 0)
+     + (sensitivity>4 ? ta.valuewhen(tot==-1, high[2], 4) : 0) + (sensitivity>5 ? ta.valuewhen(tot==-1, high[2], 5) : 0)
+     + (sensitivity>6 ? ta.valuewhen(tot==-1, high[2], 6) : 0) + (sensitivity>7 ? ta.valuewhen(tot==-1, high[2], 7) : 0)
+     + (sensitivity>8 ? ta.valuewhen(tot==-1, high[2], 8) : 0) + (sensitivity>9 ? ta.valuewhen(tot==-1, high[2], 9) : 0)
+     )/sensitivity
+
+FUp = high[4] < high[2] and high[3] < high[2] and high[1] < high[2] and high < high[2] or 
+   high[5] < high[2] and high[4] < high[2] and high[3] <= high[2] and 
+   high[1] < high[2] and high < high[2] or 
+   high[6] < high[2] and high[5] < high[2] and high[4] <= high[2] and 
+   high[3] <= high[2] and high[1] < high[2] and high < high[2] or 
+   high[7] < high[2] and high[6] < high[2] and high[5] <= high[2] and 
+   high[4] <= high[2] and high[3] <= high[2] and high[1] < high[2] and 
+   high < high[2] or 
+   high[8] < high[2] and high[7] < high[2] and high[6] <= high[2] and 
+   high[5] <= high[2] and high[4] <= high[2] and high[3] <= high[2] and 
+   high[1] < high[2] and high < high[2]
+FractalUp = useAlternateFractal ? highline : ta.valuewhen(FUp, high[2], sensitivity)
+
+FDown = low[4] > low[2] and low[3] > low[2] and low[1] > low[2] and low > low[2] or 
+   low[5] > low[2] and low[4] > low[2] and low[3] >= low[2] and low[1] > low[2] and 
+   low > low[2] or 
+   low[6] > low[2] and low[5] > low[2] and low[4] >= low[2] and low[3] >= low[2] and 
+   low[1] > low[2] and low > low[2] or 
+   low[7] > low[2] and low[6] > low[2] and low[5] >= low[2] and low[4] >= low[2] and 
+   low[3] >= low[2] and low[1] > low[2] and low > low[2] or 
+   low[8] > low[2] and low[7] > low[2] and low[6] >= low[2] and low[5] >= low[2] and 
+   low[4] >= low[2] and low[3] >= low[2] and low[1] > low[2] and low > low[2]
+FractalDown = useAlternateFractal ? lowline : ta.valuewhen(FDown, low[2], sensitivity)
+
+plot(FractalUp, "Ceiling", buyColor, 2, plot.style_stepline)
+plot(FractalDown, "Floor", sellColor, 2, plot.style_stepline)
+
+fractalUpCondition = ta.crossover(close, FractalUp)
+fractalDnCondition = ta.crossunder(close,FractalDown)
+
+// tsv
+tsv = math.sum(close>close[1]?volume*(close-close[1]):close<close[1]?volume*(close-close[1]):0, tsvLength)
+_tsvma = ta.sma(tsv, tsvma)
+
+tsvUpCondition = tsv > 0 and _tsvma > 0
+tsvDnCondition = tsv < 0 and _tsvma < 0
+
+tsvColor = tsvUpCondition ? buyColor : tsvDnCondition ? sellColor : na
+
+// baseline
+smma(src, length) =>
+    smma = 0.0
+    sma = ta.sma(src, length)
+    smma := na(smma[1]) ? sma : (smma[1] * (length - 1) + src) / length
+    smma
+
+trama(src, length) =>
+    ama = 0.
+    hh = math.max(math.sign(ta.change(ta.highest(length))),0)
+    ll = math.max(math.sign(ta.change(ta.lowest(length))*-1),0)
+    tc = math.pow(ta.sma(hh or ll ? 1 : 0,length),2)
+    ama := nz(ama[1]+tc*(src-ama[1]),src)
+    ama
+
+hma(src, length) =>
+    ta.wma(2 * ta.wma(src, length / 2) - ta.wma(src, length), math.round(math.sqrt(length)))
+
+dema(src, length) =>
+    ema = ta.ema(src, length)
+    dema = 2 * ema - ta.ema(ema, length)
+    dema
+
+tema(src, length) =>
+    ema = ta.ema(src, length)
+    ema2 = ta.ema(ema, length)
+    tema = 3 * (ema - ema2) + ta.ema(ema2, length)
+    tema
+
+ma(type, length, src) =>
+    result = type == "Smoothed" ? smma(src, length) : 
+      type == "Linear" ? ta.linreg(src, length, 0) : 
+      type == "Exponential" ? ta.ema(src, length) : 
+      type == "Weighted" ? ta.wma(src, length) : 
+      type == "Simple" ? ta.sma(src, length) :
+      type == "Trend Regularity Adaptive" ? trama(src, length) :
+      type == "Arnaud Legoux" ? ta.alma(src, length, 0.86, 5) : 
+      type == "Hull" ? hma(src, length) : 
+      type == "Double Exponential" ? dema(src, length) : 
+      type == "Triple Exponential" ? tema(src, length) : ta.sma(src, length)
+    result
+
+baseline = ma(blType, blLength, blsource)
+
+baselineUpCondition = blBias ? close > baseline : true
+baselineDnCondition = blBias ? close < baseline : true
+
+// rsi
+up = ta.rma(math.max(ta.change(rsiSource), 0), rsiLength)
+down = ta.rma(-math.min(ta.change(rsiSource), 0), rsiLength)
+rsi = down == 0 ? 100 : up == 0 ? 0 : 100 - (100 / (1 + up / down))
+
+rsima = ma(rsiMAType, rsiMALength, rsi)
+
+rsiUpCondition = rsi > rsima
+rsiDnCondition = rsi < rsima
+
+// Consolidation Zones
+consolidationZone() =>
+    float hb_ = ta.highestbars(prd) == 0 ? high : na
+    float lb_ = ta.lowestbars(prd) == 0 ? low : na
+    var int dir = 0
+    float zz = na
+    float pp = na
+    
+    dir := hb_ and na(lb_) ? 1 : lb_ and na(hb_) ? -1 : dir
+    if hb_ and lb_
+        if dir == 1
+            zz := hb_
+        else
+            zz := lb_
+    else
+        zz := hb_ ? hb_ : lb_ ? lb_ : na
+    
+    for x = 0 to 1000
+        if na(close[indexHighTf]) or dir != dir[x]
+            break
+        if zz[x]
+            if na(pp)
+                pp := zz[x]
+            else
+                if dir[x] == 1 and zz[x] > pp
+                    pp := zz[x]
+                if dir[x] == -1 and zz[x] < pp
+                    pp := zz[x]
+    
+    var int conscnt = 0
+    var float condhigh = na
+    var float condlow = na
+    
+    float H_ = ta.highest(conslen)
+    float L_ = ta.lowest(conslen)
+    
+    if ta.change(pp)
+        if conscnt > 0 and pp <= condhigh and pp >= condlow
+            conscnt := conscnt + 1
+        else
+            conscnt := 0
+    else
+        conscnt := conscnt + 1
+        
+    if conscnt >= conslen
+        if conscnt == conslen
+            condhigh := H_
+            condlow  := L_
+        else
+            condhigh := math.max(condhigh, high)
+            condlow  := math.min(condlow, low)
+        
+
+    [conscnt, condhigh, condlow]
+    
+[_conscnt, _condhigh, _condlow] = request.security(syminfo.ticker, timeframe, consolidationZone(), lookahead=barmerge.lookahead_on)
+
+// Stochastic RSI
+src = close
+rsi1 = ta.rsi(src, lengthRSI)
+k = ta.sma(ta.stoch(rsi1, rsi1, rsi1, lengthStoch), smoothK)
+d = ta.sma(k, smoothD)
+
+stochUpCondition = enableStoch ? k > d : true
+stochDnCondition = enableStoch ? k < d : true
+
+// S&R
+pivot_high = ta.pivothigh(high,left,right)
+pivot_lows = ta.pivotlow(low, left,right)
+
+quick_pivot_high = ta.pivothigh(high,left,quick_right)
+quick_pivot_lows = ta.pivotlow(low, left,quick_right)
+
+level1 = ta.valuewhen(quick_pivot_high, high[quick_right], 0)
+level2 = ta.valuewhen(quick_pivot_lows, low[quick_right], 0)
+level3 = ta.valuewhen(pivot_high, high[right], 0)
+level4 = ta.valuewhen(pivot_lows, low[right], 0)
+level5 = ta.valuewhen(pivot_high, high[right], 1)
+level6 = ta.valuewhen(pivot_lows, low[right], 1)
+level7 = ta.valuewhen(pivot_high, high[right], 2)
+level8 = ta.valuewhen(pivot_lows, low[right], 2)
+
+level1_col = close >= level1 ? buyColor : sellColor
+level2_col = close >= level2 ? buyColor : sellColor
+level3_col = close >= level3 ? buyColor : sellColor
+level4_col = close >= level4 ? buyColor : sellColor
+level5_col = close >= level5 ? buyColor : sellColor
+level6_col = close >= level6 ? buyColor : sellColor
+level7_col = close >= level7 ? buyColor : sellColor
+level8_col = close >= level8 ? buyColor : sellColor
+
+// Session
+tzDayOfWeek = dayofweek(time, "Europe/London")
+
+L = enableL ? time(timeframe.period,"0300-1200") : na
+NY= enableNY ? time(timeframe.period,"0800-1700") : na
+T = enableT ? time(timeframe.period,"2000-0300") : na
+
+active = if ts
+    if tzDayOfWeek == dayofweek.monday and showMon
+        true
+    else if tzDayOfWeek == dayofweek.tuesday and showTue
+        true
+    else if tzDayOfWeek == dayofweek.wednesday and showWed
+        true
+    else if tzDayOfWeek == dayofweek.thursday and showThu
+        true
+    else if tzDayOfWeek == dayofweek.friday and showFri
+        true
+    else if tzDayOfWeek == dayofweek.saturday and showSat
+        true
+    else if tzDayOfWeek == dayofweek.sunday and showSun
+        true
+    else
+        false
+else
+    false
+
+// Signal
+upSignal = fractalUpCondition and rsiUpCondition and tsvUpCondition and stochUpCondition and baselineUpCondition and confirmed
+dnSignal = fractalDnCondition and rsiDnCondition and tsvDnCondition and stochDnCondition and baselineDnCondition and confirmed
+
+// alert
+if upSignal or dnSignal
+    alert("StairMaster TTF > Signal Alert", repaint ? alert.freq_once_per_bar : alert.freq_once_per_bar_close)
+
+// Plot
+bgcolor(color=not na(L)  and active ? color.new(color.green, 90) : na, title='London Session')
+bgcolor(color=not na(NY) and active ? color.new(color.red, 90) : na, title='New York Session')
+bgcolor(color=not na(T)  and active ? color.new(color.orange, 90) : na, title='Tokyo Session')
+
+plot((showSR) ? level1 : na, title="S&R1", style=plot.style_circles, color=level1_col, show_last=1, linewidth=2, trackprice=true)
+plot((showSR) ? level2 : na, title="S&R2", style=plot.style_circles, color=level2_col, show_last=1, linewidth=2, trackprice=true)
+plot((showSR) ? level3 : na, title="S&R3", style=plot.style_circles, color=level3_col, show_last=1, linewidth=2, trackprice=true)
+plot((showSR) ? level4 : na, title="S&R4", style=plot.style_circles, color=level4_col, show_last=1, linewidth=2, trackprice=true)
+plot((showSR) ? level5 : na, title="S&R5", style=plot.style_circles, color=level5_col, show_last=1, linewidth=2, trackprice=true)
+plot((showSR) ? level6 : na, title="S&R6", style=plot.style_circles, color=level6_col, show_last=1, linewidth=2, trackprice=true)
+plot((showSR) ? level7 : na, title="S&R7", style=plot.style_circles, color=level7_col, show_last=1, linewidth=2, trackprice=true)
+plot((showSR) ? level8 : na, title="S&R8", style=plot.style_circles, color=level8_col, show_last=1, linewidth=2, trackprice=true)
+
+var line upline = na
+var line dnline = na
+
+if _conscnt >= conslen
+    if _conscnt != conslen
+        line.delete(upline)
+        line.delete(dnline)
+        
+    upline := line.new(bar_index, enableConsolidationZone ? _condhigh : na, bar_index - _conscnt, enableConsolidationZone ? _condhigh : na, color = buyColor, style = line.style_dashed)
+    dnline := line.new(bar_index, enableConsolidationZone ? _condlow : na , bar_index - _conscnt, enableConsolidationZone ? _condlow : na,  color = sellColor, style = line.style_dashed)
+
+consolidationZoneHigh = plot(enableConsolidationZone ? _condhigh : na, title="consolidation zone high", color=na, style = plot.style_stepline)
+consolidationZoneLow = plot(enableConsolidationZone ? _condlow : na, title="consolidation zone low", color=na, style = plot.style_stepline)
+fill(consolidationZoneHigh, consolidationZoneLow, title="consolidation zone background", color = _conscnt > conslen ? zonecol : color.new(color.white, 100))
+
+plot(baseline, "BaseLine", tsvColor, 2)
+plotchar(upSignal, "Buy", "👟", location.belowbar, editable=false, size=size.tiny)
+plotchar(dnSignal, "Sell", "👟", location.abovebar, editable=false, size=size.tiny)
