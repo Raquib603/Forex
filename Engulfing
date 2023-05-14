@@ -1,0 +1,40 @@
+//@version=5
+strategy("Engulfing Strategy", overlay=true)
+
+// Input parameters
+engulfing_perc = input(title="Engulfing Percentage", type=input.float, defval=50.0, minval=1, maxval=100)
+volume_filter = input(title="Volume Filter Enabled", type=input.bool, defval=true)
+min_volume_ratio = input(title="Minimum Volume Ratio", type=input.float, defval=1.0, minval=0.0)
+candle_color = input(title="Candle Color", type=input.color, defval=color.yellow)
+
+// Calculate engulfing volume percentage
+vol_ratio = volume / ta.sma(volume, 20) * 100
+
+// Detect bullish and bearish engulfing bars
+bullish_engulf_volume = close > open and open <= low[1] and close >= high[1] and vol_ratio >= engulfing_perc
+bearish_engulf_volume = close < open and open >= high[1] and close <= low[1] and vol_ratio >= engulfing_perc
+
+// Detect bullish and bearish engulfing candles
+bullish_engulf_candle = close[1] > open[1] and open <= low[1] and close >= high[1]
+bearish_engulf_candle = close[1] < open[1] and open >= high[1] and close <= low[1]
+
+// Execute trades based on engulfing patterns
+if bullish_engulf_volume and (not volume_filter or vol_ratio >= min_volume_ratio)
+    strategy.entry("Buy", strategy.long)
+    
+if bearish_engulf_volume and (not volume_filter or vol_ratio >= min_volume_ratio)
+    strategy.entry("Sell", strategy.short)
+    
+if bullish_engulf_candle
+    strategy.entry("Buy_Candle", strategy.long)
+    
+if bearish_engulf_candle
+    strategy.entry("Sell_Candle", strategy.short)
+
+// Plot the engulfing bars
+barcolor(bullish_engulf_volume ? candle_color : na)
+barcolor(bearish_engulf_volume ? candle_color : na)
+
+// Plot the engulfing candles
+plotshape(bullish_engulf_candle, title="Bullish Engulfing Candle", color=color.green, style=shape.labelup, text="Bullish", location=location.belowbar)
+plotshape(bearish_engulf_candle, title="Bearish Engulfing Candle", color=color.red, style=shape.labeldown, text="Bearish", location=location.abovebar)
