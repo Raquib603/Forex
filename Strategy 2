@@ -1,0 +1,48 @@
+//@version=5
+strategy("Engulfing Strategy with Stochastic RSI Cross", overlay=true)
+
+// Input parameters
+engulfing_perc = input.float(title="Engulfing Percentage", defval=50.0, minval=1.0, maxval=100.0, step=0.1)
+
+volume_filter = input.bool(title="Volume Filter Enabled", defval=true)
+min_volume_ratio = input.float(title="Minimum Volume Ratio", defval=1.0, minval=0.0)
+
+candle_color = input.color(title="Candle Color", defval=color.yellow)
+
+// Stochastic RSI parameters
+length = input(14, "Stochastic RSI Length")
+smoothK = input(3, "Stochastic RSI %K Smoothing")
+smoothD = input(3, "Stochastic RSI %D Smoothing")
+
+// Calculate engulfing volume percentage
+vol_ratio = volume / ta.sma(volume, 20) * 100
+
+// Calculate Stochastic RSI
+rsiValue = ta.rsi(close, length)
+k = ta.sma(ta.stoch(rsiValue, rsiValue, rsiValue, length), smoothK)
+d = ta.sma(k, smoothD)
+
+// Detect bullish and bearish engulfing bars
+bullish_engulf_volume = close > open and open <= low[1] and close >= high[1] and vol_ratio >= engulfing_perc
+bearish_engulf_volume = close < open and open >= high[1] and close <= low[1] and vol_ratio >= engulfing_perc
+
+// Detect bullish and bearish engulfing candles
+bullish_engulf_candle = close[1] > open[1] and open <= low[1] and close >= high[1]
+bearish_engulf_candle = close[1] < open[1] and open >= high[1] and close <= low[1]
+
+// Execute trades based on engulfing patterns and Stochastic RSI crossover
+if bullish_engulf_volume and bullish_engulf_candle and (not volume_filter or vol_ratio >= min_volume_ratio) and ta.crossover(k, d)
+    strategy.entry("Buy", strategy.long)
+    strategy.close("Sell", "strategy.short")
+    
+if bearish_engulf_volume and bearish_engulf_candle and (not volume_filter or vol_ratio >= min_volume_ratio) and ta.crossunder(k, d)
+    strategy.entry("Sell", strategy.short)
+    strategy.close ("Buy", "strategy.long")
+
+// Plot the engulfing bars
+barcolor(bullish_engulf_volume ? candle_color : na)
+barcolor(bearish_engulf_volume ? candle_color : na)
+
+// Plot the engulfing candles
+plotshape(bullish_engulf_candle, title="Bullish Engulfing Candle", color=color.green, style=shape.labelup, text="Bullish", location=location.belowbar)
+plotshape(bearish_engulf_candle, title="Bearish Engulfing Candle", color=color.red, style=shape.labeldown, text="Bearish", location=location.abovebar)
