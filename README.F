@@ -1,2 +1,2 @@
-# Forex-Indicator
-Analysis the market
+# Forex-Indicators with Pine Scripts
+
