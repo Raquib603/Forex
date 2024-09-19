@@ -1,2 +1,2 @@
-# Forex-Indicators with Pine Scripts
+#Forex-Indicators with Pine Scripts
 
