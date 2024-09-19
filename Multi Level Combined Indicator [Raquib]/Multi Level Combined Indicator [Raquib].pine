@@ -1,0 +1,462 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © alifer123
+
+// Easy to use and customizable multi-timeframe visual trend indicator
+// The indicator uses EMAs, MACD, RSI and CCI to check whether the trend is Bullish or Bearish on 5M, 15M, 30M, 1H, 4H, 1D, 1W
+// Arrows will be printed in the Dashboard to represent Bullish (▲ Green) or Bearish (▼ Red) trends on each timeframe
+// For EMA trend: Fast EMA > Slow EMA = Bullish, Fast EMA < Slow EMA = Bearish
+// For MACD trend: MACD > MACD signal line = Bullish. MACD < MACD signal line = Bearish
+// For RSI trend: RSI > RSI Bullish Level = Bullish. RSI < RSI Bullish Level = Bearish. RSI in between = Neutral (No arrow)
+// The strategy will print an RSI warning sign (⚠) in green when RSI is above the RSI Overbought level you defined
+// The strategy will print an RSI warning sign (⚠) in red when RSI is below the RSI Oversold level you defined
+// For CCI trend: CCI > 0 = Bullish. CCI < 0 = Bearish
+// The strategy will print a CCI warning sign (⚠) in green when RSI is above the CCI Overbought level you defined
+// The strategy will print a CCI warning sign (⚠) in red when RSI is below the CCI Oversold level you defined
+// The indicator also calculates Volume and a Volume SMA for all timeframes
+// A blue square (■) will be printed if Volume > Volume SMA. A yellow square (■) will be printed if Volume < Volume SMA
+// Note: Because of the limitation of 40 security requests in Pine Script, Volume for 15M and 30M has to be calculated with an SMA of the 5M Volume
+
+//@version=5
+indicator("Multi Level Combined Indicator [Raquib]", shorttitle = "MLCI[Raquib]", overlay=true)
+
+
+
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © LucemAnb
+
+//@version=5
+
+//
+//       THIS CODE IS BASED FROM THE MT4 ZIGZAG INDICATOR
+//       THE ZIGZAG SETTINGS FOR THE MAIN ONE ON TRADINGVIEW DO NOT WORK THE SAME AS MT4
+//       I HOPE U LOVE IT
+//
+
+////////
+// cloudd
+conversionPeriods = input.int(9, minval=1, title="Conversion Line Length")
+basePeriods = input.int(26, minval=1, title="Base Line Length")
+laggingSpan2Periods = input.int(52, minval=1, title="Leading Span B Length")
+displacement = input.int(26, minval=1, title="Lagging Span")
+donchian(len) => math.avg(ta.lowest(len), ta.highest(len))
+conversionLine = donchian(conversionPeriods)
+baseLine = donchian(basePeriods)
+leadLine1 = math.avg(conversionLine, baseLine)
+leadLine2 = donchian(laggingSpan2Periods)
+plot(conversionLine, color=#2962FF, title="Conversion Line")
+plot(baseLine, color=#B71C1C, title="Base Line")
+plot(close, offset = -displacement + 1, color=#43A047, title="Lagging Span")
+p1 = plot(leadLine1, offset = displacement - 1, color=#A5D6A7,
+	 title="Leading Span A")
+p2 = plot(leadLine2, offset = displacement - 1, color=#EF9A9A,
+	 title="Leading Span B")
+plot(leadLine1 > leadLine2 ? leadLine1 : leadLine2, offset = displacement - 1, title = "Kumo Cloud Upper Line", display = display.none) 
+plot(leadLine1 < leadLine2 ? leadLine1 : leadLine2, offset = displacement - 1, title = "Kumo Cloud Lower Line", display = display.none) 
+fill(p1, p2, color = leadLine1 > leadLine2 ? color.rgb(67, 160, 71, 90) : color.rgb(244, 67, 54, 90))
+
+////////
+// Fetch Ingredients 
+// [
+Depth = input.int(12, 'Depth', minval=1, step=1)
+Deviation = input.int(5, 'Deviation', minval=1, step=1)
+Backstep = input.int(2, 'Backstep', minval=2, step=1)
+line_thick = input.int(2, 'Line Thickness', minval=1, maxval=4)
+upcolor = input(color.lime, 'Bull Color')
+dncolor = input(color.red, 'Bear Color')
+repaint = input(true, 'Repaint Levels')
+// ]
+
+_high = high
+_low = low
+
+//////// 
+// Inputs
+// Input parameters
+//---------------------------
+//@version=5
+
+
+ei = input.int(50, title="Ema 1 Length")
+eii = input.int(100, title="Ema 2 Length")
+eiii = input.int(200, title="Ema 3 Length")
+
+si = ta.ema(close, ei)
+sii = ta.ema(close, eii)
+siii = ta.ema(close, eiii)
+
+plot(si, color=color.yellow, linewidth=1, title="EMA 1")
+plot(sii, color=color.orange, linewidth=1, title="EMA 2")
+plot(siii, color=color.red, linewidth=1, title="EMA 3")
+
+plot(ta.crossover(si, sii) ? si : na, style=plot.style_circles, color=color.green, linewidth=4)
+plot(ta.crossover(si, siii) ? si : na, style=plot.style_circles, color=color.green, linewidth=6)
+plot(ta.crossover(sii, siii) ? sii : na, style=plot.style_circles, color=color.green, linewidth=10)
+
+plot(ta.crossunder(si, sii) ? si : na, style=plot.style_circles, color=color.red, linewidth=4)
+plot(ta.crossunder(si, siii) ? si : na, style=plot.style_circles, color=color.red, linewidth=6)
+plot(ta.crossunder(sii, siii) ? sii : na, style=plot.style_circles, color=color.red, linewidth=10)
+
+
+
+//---------------------------
+
+// Bake
+// [
+var last_h = 1
+last_h += 1
+var last_l = 1
+last_l += 1
+var lw = 1
+var hg = 1
+lw += 1
+hg += 1
+p_lw = -ta.lowestbars(Depth)
+p_hg = -ta.highestbars(Depth)
+lowing = lw == p_lw or _low - _low[p_lw] > Deviation * syminfo.mintick
+highing = hg == p_hg or _high[p_hg] - _high > Deviation * syminfo.mintick
+lh = ta.barssince(not highing[1])
+ll = ta.barssince(not lowing[1])
+down = ta.barssince(not(lh > ll)) >= Backstep
+lower = _low[lw] > _low[p_lw]
+higher = _high[hg] < _high[p_hg]
+if lw != p_lw and (not down[1] or lower)
+    lw := p_lw < hg ? p_lw : 0
+if hg != p_hg and (down[1] or higher)
+    hg := p_hg < lw ? p_hg : 0
+
+if down and not down[1]
+    last_h := hg
+if not down and down[1]
+    last_l := lw
+
+var oldPoint = 0
+oldPoint += 1
+if down != down[1]
+    line.new(bar_index-(down? last_l: last_h), down ?_low[last_l]: _high[last_h], bar_index-(down? last_h: last_l), down ? _high[last_h]: _low[last_l], color=down? upcolor: dncolor, width=2)
+    label.new(bar_index - (down? last_h: last_l), down ? _high[last_h]: _low[last_l], down? (_high[last_h]>_high[oldPoint]? "HH": "LH"): (_low[last_l]<_low[oldPoint]? "LL": "HL"), style=down ? label.style_label_down : label.style_label_up, size=size.small, color=down ? upcolor : dncolor, textcolor=down? color.white: color.black)
+    oldPoint := down? last_l: last_h
+
+
+if repaint
+    zz = line.new(bar_index - (down ? last_h : last_l), down ? _high[last_h] : _low[last_l], bar_index - (down? lw: hg), down ? _low[lw] : _high[hg], width=line_thick, color=down ? dncolor : upcolor)
+    line.delete(zz[1])
+
+// ////////
+// // Let it Cool And Serve
+bear = down
+bgcolor(bear ? color.rgb(255, 82, 82, 50) : color.rgb(0, 230, 119, 50), title='Scanning Direction')
+
+// ////////
+// // Declare Meal Was Sweet By Force
+alertcondition(bear != bear[1], 'Direction Changed', 'Zigzag on {{ticker}} direction changed at {{time}}')
+alertcondition(bear != bear[1] and not bear, 'Bullish Direction', 'Zigzag on {{ticker}} bullish direction at {{time}}')
+alertcondition(bear != bear[1] and bear, 'Bearish Direction', 'Zigzag on {{ticker}} bearish direction at {{time}}')
+
+if bear != bear[1]
+    alert((bear? "Bearish": "Bullish") + " Direction Final " + str.tostring(down ? last_h : last_l), alert.freq_once_per_bar_close)
+
+
+
+
+// Inputs
+theme = input.string("Dark", "Theme", options=["Dark", "Light"])
+emaFastPeriod = input(50, "Fast EMA Period", group = "EMA", tooltip = "Fast EMA > Slow EMA = Bullish. Fast EMA < Slow EMA = Bearish")
+emaSlowPeriod = input(200, "Slow EMA Period", group = "EMA")
+macdFastLength = input(12, "MACD Fast Length", group = "MACD", tooltip = "MACD > MACD signal line = Bullish. MACD < MACD signal line = Bearish")
+macdSlowLength = input(26, "MACD Slow Length", group = "MACD")
+macdSignalLength = input(9, "MACD Signal Length", group = "MACD")
+rsiPeriod = input(14, "RSI Period", group = "RSI", tooltip = "RSI > RSI Bullish Level = Bullish. RSI < RSI Bullish Level = Bearish. RSI in between = Neutral")
+rsiBullishLevel = input(50, "RSI Bullish Level", group = "RSI", tooltip = "MUST be >= RSI Bearish Level")
+rsiBearishLevel = input(50, "RSI Bearish Level", group = "RSI", tooltip = "MUST be <= RSI Bullish Level")
+rsiOverbought = input(70, "RSI Overbought", group = "RSI", tooltip = "Strategy will print a warning sign when RSI is above this value. Must be > RSI Bullish Level")
+rsiOversold = input(30, "RSI Oversold", group = "RSI", tooltip = "Strategy will print a warning sign when RSI is below this value. Must be < RSI Bearish Level")
+cciPeriod = input(14, "CCI Period", group = "CCI", tooltip = "CCI > 0 = Bullish. CCI < 0 = Bearish")
+cciOverbought = input.int(defval = 100, minval = 1, title = "CCI Overbought Level", group = "CCI", tooltip = "Strategy will print a warning sign when CCI is above this value")
+cciOversold = input.int(defval = -100, maxval = -1, title = "CCI Oversold Level", group = "CCI", tooltip = "Strategy will print a warning sign when CCI is below this value")
+volumePeriod = input.int(defval = 30, minval = 1, title = "Volume SMA Period", group = "Volume", tooltip = "If Volume > Volume SMA = Blue square. If Volume < Volume SMA = Yellow square")
+
+// Calculate EMAs on multiple timeframes
+emaFast_5min = request.security(syminfo.tickerid, "5", ta.ema(close, emaFastPeriod))
+emaSlow_5min = request.security(syminfo.tickerid, "5", ta.ema(close, emaSlowPeriod))
+emaFast_15min = request.security(syminfo.tickerid, "15", ta.ema(close, emaFastPeriod))
+emaSlow_15min = request.security(syminfo.tickerid, "15", ta.ema(close, emaSlowPeriod))
+emaFast_30min = request.security(syminfo.tickerid, "30", ta.ema(close, emaFastPeriod))
+emaSlow_30min = request.security(syminfo.tickerid, "30", ta.ema(close, emaSlowPeriod))
+emaFast_1hour = request.security(syminfo.tickerid, "60", ta.ema(close, emaFastPeriod))
+emaSlow_1hour = request.security(syminfo.tickerid, "60", ta.ema(close, emaSlowPeriod))
+emaFast_4hour = request.security(syminfo.tickerid, "240", ta.ema(close, emaFastPeriod))
+emaSlow_4hour = request.security(syminfo.tickerid, "240", ta.ema(close, emaSlowPeriod))
+emaFast_daily = request.security(syminfo.tickerid, "D", ta.ema(close, emaFastPeriod))
+emaSlow_daily = request.security(syminfo.tickerid, "D", ta.ema(close, emaSlowPeriod))
+emaFast_weekly = request.security(syminfo.tickerid, "W", ta.ema(close, emaFastPeriod))
+emaSlow_weekly = request.security(syminfo.tickerid, "W", ta.ema(close, emaSlowPeriod))
+
+// Calculate MACD on multiple timeframes
+[macdLine_5min, signalLine_5min, _] = request.security(syminfo.tickerid, "5", ta.macd(close, macdFastLength, macdSlowLength, macdSignalLength))
+[macdLine_15min, signalLine_15min, _] = request.security(syminfo.tickerid, "15", ta.macd(close, macdFastLength, macdSlowLength, macdSignalLength))
+[macdLine_30min, signalLine_30min, _] = request.security(syminfo.tickerid, "30", ta.macd(close, macdFastLength, macdSlowLength, macdSignalLength))
+[macdLine_1hour, signalLine_1hour, _] = request.security(syminfo.tickerid, "60", ta.macd(close, macdFastLength, macdSlowLength, macdSignalLength))
+[macdLine_4hour, signalLine_4hour, _] = request.security(syminfo.tickerid, "240", ta.macd(close, macdFastLength, macdSlowLength, macdSignalLength))
+[macdLine_daily, signalLine_daily, _] = request.security(syminfo.tickerid, "D", ta.macd(close, macdFastLength, macdSlowLength, macdSignalLength))
+[macdLine_weekly, signalLine_weekly, _] = request.security(syminfo.tickerid, "W", ta.macd(close, macdFastLength, macdSlowLength, macdSignalLength))
+
+// Calculate RSI on multiple timeframes
+rsi_5min = request.security(syminfo.tickerid, "5", ta.rsi(close, rsiPeriod))
+rsi_15min = request.security(syminfo.tickerid, "15", ta.rsi(close, rsiPeriod))
+rsi_30min = request.security(syminfo.tickerid, "30", ta.rsi(close, rsiPeriod))
+rsi_1hour = request.security(syminfo.tickerid, "60", ta.rsi(close, rsiPeriod))
+rsi_4hour = request.security(syminfo.tickerid, "240", ta.rsi(close, rsiPeriod))
+rsi_daily = request.security(syminfo.tickerid, "D", ta.rsi(close, rsiPeriod))
+rsi_weekly = request.security(syminfo.tickerid, "W", ta.rsi(close, rsiPeriod))
+
+// Calculate CCI on multiple timeframes
+cci_5min = request.security(syminfo.tickerid, "5", ta.cci(close, cciPeriod))
+cci_15min = request.security(syminfo.tickerid, "15", ta.cci(close, cciPeriod))
+cci_30min = request.security(syminfo.tickerid, "30", ta.cci(close, cciPeriod))
+cci_1hour = request.security(syminfo.tickerid, "60", ta.cci(close, cciPeriod))
+cci_4hour = request.security(syminfo.tickerid, "240", ta.cci(close, cciPeriod))
+cci_daily = request.security(syminfo.tickerid, "D", ta.cci(close, cciPeriod))
+cci_weekly = request.security(syminfo.tickerid, "W", ta.cci(close, cciPeriod))
+
+// CAlculate Volume on multiple timeframes
+volume_5min = request.security(syminfo.tickerid, "5", volume)
+volume_15min = ta.sma(volume_5min, 3)
+volume_30min = ta.sma(volume_5min, 6)
+volume_1hour = request.security(syminfo.tickerid, "60", volume)
+volume_4hour = request.security(syminfo.tickerid, "240", volume)
+volume_daily = request.security(syminfo.tickerid, "D", volume)
+volume_weekly = request.security(syminfo.tickerid, "W", volume)
+
+// Calculate Volume Moving Average for different timeframes
+vma_5min = ta.sma(volume_5min, volumePeriod)
+vma_15min = ta.sma(volume_15min, volumePeriod)
+vma_30min = ta.sma(volume_30min, volumePeriod)
+vma_1hour = ta.sma(volume_1hour, volumePeriod)
+vma_4hour = ta.sma(volume_4hour, volumePeriod)
+vma_daily = ta.sma(volume_daily, volumePeriod)
+vma_weekly = ta.sma(volume_weekly, volumePeriod)
+
+// Determine EMA trends
+isBullish_5min = emaFast_5min > emaSlow_5min
+isBearish_5min = emaFast_5min < emaSlow_5min
+isBullish_15min = emaFast_15min > emaSlow_15min
+isBearish_15min = emaFast_15min < emaSlow_15min
+isBullish_30min = emaFast_30min > emaSlow_30min
+isBearish_30min = emaFast_30min < emaSlow_30min
+isBullish_1hour = emaFast_1hour > emaSlow_1hour
+isBearish_1hour = emaFast_1hour < emaSlow_1hour
+isBullish_4hour = emaFast_4hour > emaSlow_4hour
+isBearish_4hour = emaFast_4hour < emaSlow_4hour
+isBullish_daily = emaFast_daily > emaSlow_daily
+isBearish_daily = emaFast_daily < emaSlow_daily
+isBullish_weekly = emaFast_weekly > emaSlow_weekly
+isBearish_weekly = emaFast_weekly < emaSlow_weekly
+
+// Determine MACD trends
+isBullishMACD_5min = macdLine_5min > signalLine_5min
+isBearishMACD_5min = macdLine_5min < signalLine_5min
+isBullishMACD_15min = macdLine_15min > signalLine_15min
+isBearishMACD_15min = macdLine_15min < signalLine_15min
+isBullishMACD_30min = macdLine_30min > signalLine_30min
+isBearishMACD_30min = macdLine_30min < signalLine_30min
+isBullishMACD_1hour = macdLine_1hour > signalLine_1hour
+isBearishMACD_1hour = macdLine_1hour < signalLine_1hour
+isBullishMACD_4hour = macdLine_4hour > signalLine_4hour
+isBearishMACD_4hour = macdLine_4hour < signalLine_4hour
+isBullishMACD_daily = macdLine_daily > signalLine_daily
+isBearishMACD_daily = macdLine_daily < signalLine_daily
+isBullishMACD_weekly = macdLine_weekly > signalLine_weekly
+isBearishMACD_weekly = macdLine_weekly < signalLine_weekly
+
+// Determine RSI trends
+isBullishRSI_5min = rsi_5min > rsiBullishLevel
+isBearishRSI_5min = rsi_5min < rsiBearishLevel
+isRSIBullSign_5min = rsi_5min > rsiBullishLevel and rsi_5min < rsiOverbought
+isRSIBearSign_5min = rsi_5min < rsiBearishLevel and rsi_5min > rsiOversold
+isRSIWarning_5min = rsi_5min >= rsiOverbought or rsi_5min <= rsiOversold
+isBullishRSI_15min = rsi_15min > rsiBullishLevel
+isBearishRSI_15min = rsi_15min < rsiBearishLevel
+isRSIBullSign_15min = rsi_15min > rsiBullishLevel and rsi_15min < rsiOverbought
+isRSIBearSign_15min = rsi_15min < rsiBearishLevel and rsi_15min > rsiOversold
+isRSIWarning_15min = rsi_15min >= rsiOverbought or rsi_15min <= rsiOversold
+isBullishRSI_30min = rsi_30min > rsiBullishLevel
+isBearishRSI_30min = rsi_30min < rsiBearishLevel
+isRSIBullSign_30min = rsi_30min > rsiBullishLevel and rsi_30min < rsiOverbought
+isRSIBearSign_30min = rsi_30min < rsiBearishLevel and rsi_30min > rsiOversold
+isRSIWarning_30min = rsi_30min >= rsiOverbought or rsi_30min <= rsiOversold
+isBullishRSI_1hour = rsi_1hour > rsiBullishLevel
+isBearishRSI_1hour = rsi_1hour < rsiBearishLevel
+isRSIBullSign_1hour = rsi_1hour > rsiBullishLevel and rsi_1hour < rsiOverbought
+isRSIBearSign_1hour = rsi_1hour < rsiBearishLevel and rsi_1hour > rsiOversold
+isRSIWarning_1hour = rsi_1hour >= rsiOverbought or rsi_1hour <= rsiOversold
+isBullishRSI_4hour = rsi_4hour > rsiBullishLevel
+isBearishRSI_4hour = rsi_4hour < rsiBearishLevel
+isRSIBullSign_4hour = rsi_4hour > rsiBullishLevel and rsi_4hour < rsiOverbought
+isRSIBearSign_4hour = rsi_4hour < rsiBearishLevel and rsi_4hour > rsiOversold
+isRSIWarning_4hour = rsi_4hour >= rsiOverbought or rsi_4hour <= rsiOversold
+isBullishRSI_daily = rsi_daily > rsiBullishLevel
+isBearishRSI_daily = rsi_daily < rsiBearishLevel
+isRSIBullSign_daily = rsi_daily > rsiBullishLevel and rsi_daily < rsiOverbought
+isRSIBearSign_daily = rsi_daily < rsiBearishLevel and rsi_daily > rsiOversold
+isRSIWarning_daily = rsi_daily >= rsiOverbought or rsi_daily <= rsiOversold
+isBullishRSI_weekly = rsi_weekly > rsiBullishLevel
+isBearishRSI_weekly = rsi_weekly < rsiBearishLevel
+isRSIBullSign_weekly = rsi_weekly > rsiBullishLevel and rsi_weekly < rsiOverbought
+isRSIBearSign_weekly = rsi_weekly < rsiBearishLevel and rsi_weekly > rsiOversold
+isRSIWarning_weekly = rsi_weekly >= rsiOverbought or rsi_weekly <= rsiOversold
+
+// Determine CCI trends
+isBullishCCI_5min = cci_5min > 0
+isBearishCCI_5min = cci_5min < 0
+isCCIBullSign_5min = cci_5min > 0 and cci_5min < cciOverbought
+isCCIBearSign_5min = cci_5min < 0 and cci_5min > cciOversold
+isCCIWarning_5min = cci_5min >= cciOverbought or cci_5min <= cciOversold
+isBullishCCI_15min = cci_15min > 0
+isBearishCCI_15min = cci_15min < 0
+isCCIBullSign_15min = cci_15min > 0 and cci_15min < cciOverbought
+isCCIBearSign_15min = cci_15min < 0 and cci_15min > cciOversold
+isCCIWarning_15min = cci_15min >= cciOverbought or cci_15min <= cciOversold
+isBullishCCI_30min = cci_30min > 0
+isBearishCCI_30min = cci_30min < 0
+isCCIBullSign_30min = cci_30min > 0 and cci_30min < cciOverbought
+isCCIBearSign_30min = cci_30min < 0 and cci_30min > cciOversold
+isCCIWarning_30min = cci_30min >= cciOverbought or cci_30min <= cciOversold
+isBullishCCI_1hour = cci_1hour > 0
+isBearishCCI_1hour = cci_1hour < 0
+isCCIBullSign_1hour = cci_1hour > 0 and cci_1hour < cciOverbought
+isCCIBearSign_1hour = cci_1hour < 0 and cci_1hour > cciOversold
+isCCIWarning_1hour = cci_1hour >= cciOverbought or cci_1hour <= cciOversold
+isBullishCCI_4hour = cci_4hour > 0
+isBearishCCI_4hour = cci_4hour < 0
+isCCIBullSign_4hour = cci_4hour > 0 and cci_4hour < cciOverbought
+isCCIBearSign_4hour = cci_4hour < 0 and cci_4hour > cciOversold
+isCCIWarning_4hour = cci_4hour >= cciOverbought or cci_4hour <= cciOversold
+isBullishCCI_daily = cci_daily > 0
+isBearishCCI_daily = cci_daily < 0
+isCCIBullSign_daily = cci_daily > 0 and cci_daily < cciOverbought
+isCCIBearSign_daily = cci_daily < 0 and cci_daily > cciOversold
+isCCIWarning_daily = cci_daily >= cciOverbought or cci_daily <= cciOversold
+isBullishCCI_weekly = cci_weekly > 0
+isBearishCCI_weekly = cci_weekly < 0
+isCCIBullSign_weekly = cci_weekly > 0 and cci_weekly < cciOverbought
+isCCIBearSign_weekly = cci_weekly < 0 and cci_weekly > cciOversold
+isCCIWarning_weekly = cci_weekly >= cciOverbought or cci_weekly <= cciOversold
+
+// Determine if Volume > VMA
+isVolume5min = volume_5min > vma_5min
+isVolume15min = volume_15min > vma_15min
+isVolume30min = volume_30min > vma_30min
+isVolume1hour = volume_1hour > vma_1hour
+isVolume4hour = volume_4hour > vma_4hour
+isVolumeDaily = volume_daily > vma_daily
+isVolumeWeekly = volume_weekly > vma_weekly
+
+// EMA-based color
+color5m = emaFast_5min > emaSlow_5min ? color.green : color.red
+color15m = emaFast_15min > emaSlow_15min ? color.green : color.red
+color30m = emaFast_30min > emaSlow_30min ? color.green : color.red
+color1h = emaFast_1hour > emaSlow_1hour ? color.green : color.red
+color4h = emaFast_4hour > emaSlow_4hour ? color.green : color.red
+color1d = emaFast_daily > emaSlow_daily ? color.green : color.red
+color1w = emaFast_weekly > emaSlow_weekly ? color.green : color.red
+
+// MACD-based color
+colorMACD_5min = isBullishMACD_5min ? color.green : color.red
+colorMACD_15min = isBullishMACD_15min ? color.green : color.red
+colorMACD_30min = isBullishMACD_30min ? color.green : color.red
+colorMACD_1hour = isBullishMACD_1hour ? color.green : color.red
+colorMACD_4hour = isBullishMACD_4hour ? color.green : color.red
+colorMACD_daily = isBullishMACD_daily ? color.green : color.red
+colorMACD_weekly = isBullishMACD_weekly ? color.green : color.red
+
+// RSI-based color
+colorRSI_5min = isBullishRSI_5min ? color.green : color.red
+colorRSI_15min = isBullishRSI_15min ? color.green : color.red
+colorRSI_30min = isBullishRSI_30min ? color.green : color.red
+colorRSI_1hour = isBullishRSI_1hour ? color.green : color.red
+colorRSI_4hour = isBullishRSI_4hour ? color.green : color.red
+colorRSI_daily = isBullishRSI_daily ? color.green : color.red
+colorRSI_weekly = isBullishRSI_weekly ? color.green : color.red
+
+// CCI-based color
+colorCCI_5min = isBullishCCI_5min ? color.green : color.red
+colorCCI_15min = isBullishCCI_15min ? color.green : color.red
+colorCCI_30min = isBullishCCI_30min ? color.green : color.red
+colorCCI_1hour = isBullishCCI_1hour ? color.green : color.red
+colorCCI_4hour = isBullishCCI_4hour ? color.green : color.red
+colorCCI_daily = isBullishCCI_daily ? color.green : color.red
+colorCCI_weekly = isBullishCCI_weekly ? color.green : color.red
+
+// Volume-based color
+colorVolume_5min = isVolume5min ? color.blue : color.orange
+colorVolume_15min = isVolume15min ? color.blue : color.orange
+colorVolume_30min = isVolume30min ? color.blue : color.orange
+colorVolume_1hour = isVolume1hour ? color.blue : color.orange
+colorVolume_4hour = isVolume4hour ? color.blue : color.orange
+colorVolume_Daily = isVolumeDaily ? color.blue : color.orange
+colorVolume_Weekly = isVolumeWeekly ? color.blue : color.orange
+
+// Create dashboard
+var bgcolor = theme == "Light" ? color.new(#000000, 90) : color.new(#555555, 90)
+var frame_color = theme == "Light" ? color.new(#000000, 10) : color.new(#555555, 10)
+var border_color = theme == "Light" ? color.new(#000000, 10) : color.new(#555555, 10)
+var text_color = theme == "Light" ? color.new(#000000, 0) : color.new(#ffffff, 0)
+
+var table trendTable = table.new(position.top_right, 9, 7, bgcolor=bgcolor, 
+     frame_color = frame_color, frame_width = 1, border_color = border_color, border_width = 1)
+     
+table.cell(trendTable, 1, 1, "", text_color=text_color)
+table.cell(trendTable, 1, 2, "EMA", text_color=text_color)
+//table.cell(trendTable, 1, 3, "MACD", text_color=text_color)
+//table.cell(trendTable, 1, 4, "RSI", text_color=text_color)
+//table.cell(trendTable, 1, 5, "CCI", text_color=text_color)
+//table.cell(trendTable, 1, 6, "VOL", text_color=text_color)
+
+table.cell(trendTable, 2, 1, "5M ", text_color=text_color)
+table.cell(trendTable, 2, 2, isBullish_5min ? "▲" : isBearish_5min ? "▼" : "", text_color=color5m)
+//table.cell(trendTable, 2, 3, isBullishMACD_5min ? "▲" : isBearishMACD_5min ? "▼" : "", text_color=colorMACD_5min)
+//table.cell(trendTable, 2, 4, isRSIWarning_5min ? "⚠" : isRSIBullSign_5min ? "▲" : isRSIBearSign_5min ? "▼" : "", text_color=colorRSI_5min)
+//table.cell(trendTable, 2, 5, isCCIWarning_5min ? "⚠" : isCCIBullSign_5min ? "▲" : isCCIBearSign_5min ? "▼" : "", text_color=colorCCI_5min)
+//table.cell(trendTable, 2, 6, "■", text_color=colorVolume_5min)
+
+table.cell(trendTable, 3, 1, "15M", text_color=text_color)
+table.cell(trendTable, 3, 2, isBullish_15min ? "▲" : isBearish_15min ? "▼" : "", text_color=color15m)
+//table.cell(trendTable, 3, 3, isBullishMACD_15min ? "▲" : isBearishMACD_15min ? "▼" : "", text_color=colorMACD_15min)
+//table.cell(trendTable, 3, 4, isRSIWarning_15min ? "⚠" : isRSIBullSign_15min ? "▲" : isRSIBearSign_15min ? "▼" : "", text_color=colorRSI_15min)
+//table.cell(trendTable, 3, 5, isCCIWarning_15min ? "⚠" : isCCIBullSign_15min ? "▲" : isCCIBearSign_15min ? "▼" : "", text_color=colorCCI_15min)
+//table.cell(trendTable, 3, 6, "■", text_color=colorVolume_15min)
+
+table.cell(trendTable, 4, 1, "30M", text_color=text_color)
+table.cell(trendTable, 4, 2, isBullish_30min ? "▲" : isBearish_30min ? "▼" : "", text_color=color30m)
+//table.cell(trendTable, 4, 3, isBullishMACD_30min ? "▲" : isBearishMACD_30min ? "▼" : "", text_color=colorMACD_30min)
+//table.cell(trendTable, 4, 4, isRSIWarning_30min ? "⚠" : isRSIBullSign_30min ? "▲" : isRSIBearSign_30min ? "▼" : "", text_color=colorRSI_30min)
+//table.cell(trendTable, 4, 5, isCCIWarning_30min ? "⚠" : isCCIBullSign_30min ? "▲" : isCCIBearSign_30min ? "▼" : "", text_color=colorCCI_30min)
+//table.cell(trendTable, 4, 6, "■", text_color=colorVolume_30min)
+
+table.cell(trendTable, 5, 1, "1H ", text_color=text_color)
+table.cell(trendTable, 5, 2, isBullish_1hour ? "▲" : isBearish_1hour ? "▼" : "", text_color=color1h)
+//table.cell(trendTable, 5, 3, isBullishMACD_1hour ? "▲" : isBearishMACD_1hour ? "▼" : "", text_color=colorMACD_1hour)
+//table.cell(trendTable, 5, 4, isRSIWarning_1hour ? "⚠" : isRSIBullSign_1hour ? "▲" : isRSIBearSign_1hour ? "▼" : "", text_color=colorRSI_1hour)
+//table.cell(trendTable, 5, 5, isCCIWarning_1hour ? "⚠" : isCCIBullSign_1hour ? "▲" : isCCIBearSign_1hour ? "▼" : "", text_color=colorCCI_1hour)
+//table.cell(trendTable, 5, 6, "■", text_color=colorVolume_1hour)
+
+table.cell(trendTable, 6, 1, "4H ", text_color=text_color)
+table.cell(trendTable, 6, 2, isBullish_4hour ? "▲" : isBearish_4hour ? "▼" : "", text_color=color4h)
+//table.cell(trendTable, 6, 3, isBullishMACD_4hour ? "▲" : isBearishMACD_4hour ? "▼" : "", text_color=colorMACD_4hour)
+//table.cell(trendTable, 6, 4, isRSIWarning_4hour ? "⚠" : isRSIBullSign_4hour ? "▲" : isRSIBearSign_4hour ? "▼" : "", text_color=colorRSI_4hour)
+//table.cell(trendTable, 6, 5, isCCIWarning_4hour ? "⚠" : isCCIBullSign_4hour ? "▲" : isCCIBearSign_4hour ? "▼" : "", text_color=colorCCI_4hour)
+//table.cell(trendTable, 6, 6, "■", text_color=colorVolume_4hour)
+
+table.cell(trendTable, 7, 1, "1D ", text_color=text_color)
+table.cell(trendTable, 7, 2, emaFast_daily > emaSlow_daily ? "▲" : emaFast_daily < emaSlow_daily ? "▼" : "", text_color=color1d)
+//table.cell(trendTable, 7, 3, macdLine_daily > signalLine_daily ? "▲" : macdLine_daily < signalLine_daily ? "▼" : "", text_color=colorMACD_daily)
+//table.cell(trendTable, 7, 4, isRSIWarning_daily ? "⚠" : isRSIBullSign_daily ? "▲" : isRSIBearSign_daily ? "▼" : "", text_color=colorRSI_daily)
+//table.cell(trendTable, 7, 5, isCCIWarning_daily ? "⚠" : isCCIBullSign_daily ? "▲" : isCCIBearSign_daily ? "▼" : "", text_color=colorCCI_daily)
+//table.cell(trendTable, 7, 6, "■", text_color=colorVolume_Daily)
+
+table.cell(trendTable, 8, 1, "1W ", text_color=text_color)
+table.cell(trendTable, 8, 2, emaFast_weekly > emaSlow_weekly ? "▲" : emaFast_weekly < emaSlow_weekly ? "▼" : "", text_color=color1w)
+//table.cell(trendTable, 8, 3, macdLine_weekly > signalLine_weekly ? "▲" : macdLine_weekly < signalLine_weekly ? "▼" : "", text_color=colorMACD_weekly)
+//table.cell(trendTable, 8, 4, isRSIWarning_weekly ? "⚠" : isRSIBullSign_weekly ? "▲" : isRSIBearSign_weekly ? "▼" : "", text_color=colorRSI_weekly)
+//table.cell(trendTable, 8, 5, isCCIWarning_weekly ? "⚠" : isCCIBullSign_weekly ? "▲" : isCCIBearSign_weekly ? "▼" : "", text_color=colorCCI_weekly)
+//table.cell(trendTable, 8, 6, "■", text_color=colorVolume_Weekly)
